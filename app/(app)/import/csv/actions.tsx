@@ -2,12 +2,18 @@
 
 import { ActionState } from "@/lib/actions"
 import { getCurrentUser } from "@/lib/auth"
+import { EXPORT_AND_IMPORT_FIELD_MAP } from "@/models/export_and_import"
+import { getCurrentMembership } from "@/lib/organization"
 import {
-  createCsvImportJobContext,
-  createImportArtifact,
-  processCsvRowsForImportJob,
-} from "@/services/import-jobs-service"
-import { Prisma, Transaction } from "@/prisma/client"
+  createDataSourceForCsvImport,
+  createImportJob,
+  IMPORT_JOB_TYPE,
+  markImportJobCompleted,
+  markImportJobFailed,
+  markImportJobRunning,
+} from "@/models/import-jobs"
+import { createTransaction } from "@/models/transactions"
+import { Transaction } from "@/prisma/client"
 import { parse } from "@fast-csv/parse"
 import { revalidatePath } from "next/cache"
 
@@ -50,29 +56,49 @@ export async function saveTransactionsAction(
   formData: FormData
 ): Promise<ActionState<Transaction>> {
   const user = await getCurrentUser()
+  const membership = await getCurrentMembership()
+
+  let importJobId: string | null = null
 
   try {
     const rows = JSON.parse(formData.get("rows") as string) as Record<string, unknown>[]
 
-    const context = await createCsvImportJobContext(user.id, rows.length)
-
-    await createImportArtifact({
-      importJobId: context.importJob.id,
-      organizationId: context.organizationId,
+    const dataSource = await createDataSourceForCsvImport(user.id, membership.organizationId)
+    const importJob = await createImportJob({
       userId: user.id,
-      kind: "input-rows",
-      name: "CSV 输入行",
-      payload: {
-        rows: rows as Prisma.InputJsonValue,
-      },
+      organizationId: membership.organizationId,
+      dataSourceId: dataSource.id,
+      type: IMPORT_JOB_TYPE.csvTransactions,
+      input: { totalRows: rows.length },
     })
 
-    const result = await processCsvRowsForImportJob({
-      importJobId: context.importJob.id,
-      organizationId: context.organizationId,
-      userId: user.id,
-      rows,
-    })
+    importJobId = importJob.id
+
+    await markImportJobRunning(importJob.id)
+
+    let importedCount = 0
+
+    for (const row of rows) {
+      const transactionData: Record<string, unknown> = {}
+      for (const [fieldCode, value] of Object.entries(row)) {
+        const fieldDef = EXPORT_AND_IMPORT_FIELD_MAP[fieldCode]
+        if (fieldDef?.import) {
+          transactionData[fieldCode] = await fieldDef.import(user.id, value as string)
+        } else {
+          transactionData[fieldCode] = value as string
+        }
+      }
+
+      await createTransaction(user.id, transactionData)
+      importedCount += 1
+    }
+
+    if (importJobId) {
+      await markImportJobCompleted(importJobId, {
+        importedCount,
+        failedCount: rows.length - importedCount,
+      })
+    }
 
     revalidatePath("/import/csv")
     revalidatePath("/import/jobs")
@@ -85,6 +111,11 @@ export async function saveTransactionsAction(
     return { success: true }
   } catch (error) {
     console.error("Error saving transactions:", error)
+
+    if (importJobId) {
+      await markImportJobFailed(importJobId, String(error))
+    }
+
     return { success: false, error: "保存交易失败：" + error }
   }
 }

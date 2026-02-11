@@ -1,15 +1,14 @@
 import { getCurrentUser } from "@/lib/auth"
+import { getCurrentMembership } from "@/lib/organization"
+import { createImportJob, getImportJobsByOrganization, IMPORT_JOB_TYPE } from "@/models/import-jobs"
 import { NextRequest, NextResponse } from "next/server"
 import { Prisma } from "@/prisma/client"
-import {
-  createImportJobForCurrentOrganization,
-  listImportJobsForCurrentOrganization,
-} from "@/services/import-jobs-service"
 
 export async function GET() {
   try {
     await getCurrentUser()
-    const jobs = await listImportJobsForCurrentOrganization(30)
+    const membership = await getCurrentMembership()
+    const jobs = await getImportJobsByOrganization(membership.organizationId, 30)
 
     return NextResponse.json({ jobs })
   } catch (error) {
@@ -20,17 +19,21 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
+    const membership = await getCurrentMembership()
     const payload = (await request.json().catch(() => ({}))) as {
       type?: string
       input?: Record<string, unknown>
       dataSourceId?: string
     }
 
-    const job = await createImportJobForCurrentOrganization({
+    const type = payload.type || IMPORT_JOB_TYPE.csvTransactions
+
+    const job = await createImportJob({
       userId: user.id,
-      type: payload.type,
+      organizationId: membership.organizationId,
       dataSourceId: payload.dataSourceId,
-      payload: payload.input as Prisma.InputJsonValue | undefined,
+      type: type as (typeof IMPORT_JOB_TYPE)[keyof typeof IMPORT_JOB_TYPE],
+      input: payload.input as Prisma.InputJsonValue | undefined,
     })
 
     return NextResponse.json({ job }, { status: 201 })

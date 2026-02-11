@@ -193,18 +193,12 @@
 
 ### 10.1 已完成（截至当前）
 
-- 前后端解耦推进：新增 `services/import-jobs-service.ts` 作为导入业务编排层，并收敛页面/API/Server Action 对导入流程的调用边界。
-- 新增 AI 定向修改能力基础：`/api/ai/change-request` + 请求结构规范文档，可明确指定文件与片段修改。
 - 默认中文界面与英文切换能力（侧边栏、设置页、布局层）。
 - 多租户基础：`organizations`、`memberships`、`audit_logs`。
 - 组织上下文自动兜底：用户首次访问自动补齐主组织 membership。
 - `work` 分支验收工作流（CI）与构建阻塞问题修复。
 - 导入中台第一阶段：`data_sources`、`import_jobs`、CSV 导入链路接入。
 - 导入任务监控页：组织级任务总览、状态可视化、最近任务列表。
-- 导入执行轨迹二期：新增 `import_job_runs` / `import_job_artifacts`，记录每次执行 attempt 与摘要/错误工件。
-- 导入任务重试与详情：新增重试 API 与任务详情页（runs/artifacts 可视化），可追踪并触发失败任务重试。
-- 异步落地起步：新增 worker 处理端点（`/api/imports/worker/process-next`）与 `input-rows` 工件，重试后可由后台消费 pending 任务。
-- AI 智能体起步：新增 `chat_sessions/chat_messages` 数据模型与 `agent/chat` API，支持会话持久化与组织上下文问答。
 
 ### 10.2 进行中
 
@@ -213,11 +207,10 @@
 
 ### 10.3 下一步（推荐顺序）
 
-1. 将 worker 端点接入调度器（Cron/Queue），实现持续后台处理与并发控制。
-2. 智能体二期：接入工具调用（指标/规则/证据）并输出带引用回答。
-3. 指标引擎 MVP：先落 5~10 个核心财税指标，固化口径与版本。
-4. 规则引擎 MVP：先落 10 条高频风险规则，并产出证据引用。
-5. 报告导出（PDF）模板化交付，衔接分析师审核流。
+1. `job_runs` / `job_artifacts` 落表，支持多次重跑与结果对账。
+2. 指标引擎 MVP：先落 5~10 个核心财税指标，固化口径与版本。
+3. 规则引擎 MVP：先落 10 条高频风险规则，并产出证据引用。
+4. 报告导出（PDF）模板化交付，衔接分析师审核流。
 
 ### 10.4 维护约定
 

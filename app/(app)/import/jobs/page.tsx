@@ -1,15 +1,15 @@
 import { ImportJobsOverview } from "@/components/import/jobs-overview"
 import { getCurrentUser } from "@/lib/auth"
-import {
-  getImportJobSummaryForCurrentOrganization,
-  listImportJobsForCurrentOrganization,
-} from "@/services/import-jobs-service"
+import { getCurrentMembership } from "@/lib/organization"
+import { getImportJobSummaryByOrganization, getImportJobsByOrganization } from "@/models/import-jobs"
 
 export default async function ImportJobsPage() {
   await getCurrentUser()
+  const membership = await getCurrentMembership()
+
   const [jobs, summary] = await Promise.all([
-    listImportJobsForCurrentOrganization(30),
-    getImportJobSummaryForCurrentOrganization(),
+    getImportJobsByOrganization(membership.organizationId, 30),
+    getImportJobSummaryByOrganization(membership.organizationId),
   ])
 
   return (

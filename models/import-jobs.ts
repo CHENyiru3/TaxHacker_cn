@@ -16,14 +16,6 @@ export const IMPORT_JOB_TYPE = {
 
 export type ImportJobType = (typeof IMPORT_JOB_TYPE)[keyof typeof IMPORT_JOB_TYPE]
 
-export const IMPORT_JOB_RUN_STATUS = {
-  running: "running",
-  completed: "completed",
-  failed: "failed",
-} as const
-
-export type ImportJobRunStatus = (typeof IMPORT_JOB_RUN_STATUS)[keyof typeof IMPORT_JOB_RUN_STATUS]
-
 export async function createDataSourceForCsvImport(userId: string, organizationId: string) {
   return await prisma.dataSource.upsert({
     where: {
@@ -65,30 +57,6 @@ export async function createImportJob(input: {
   })
 }
 
-export async function createImportJobRun(input: { importJobId: string; userId: string; organizationId: string }) {
-  const latestRun = await prisma.importJobRun.findFirst({
-    where: {
-      importJobId: input.importJobId,
-    },
-    orderBy: {
-      attempt: "desc",
-    },
-    select: {
-      attempt: true,
-    },
-  })
-
-  return await prisma.importJobRun.create({
-    data: {
-      importJobId: input.importJobId,
-      userId: input.userId,
-      organizationId: input.organizationId,
-      attempt: (latestRun?.attempt ?? 0) + 1,
-      status: IMPORT_JOB_RUN_STATUS.running,
-    },
-  })
-}
-
 export async function markImportJobRunning(jobId: string) {
   return await prisma.importJob.update({
     where: { id: jobId },
@@ -124,90 +92,11 @@ export async function markImportJobFailed(jobId: string, error: string, result?:
   })
 }
 
-export async function resetImportJobToPending(jobId: string, userId: string, organizationId: string) {
-  return await prisma.importJob.updateMany({
-    where: {
-      id: jobId,
-      userId,
-      organizationId,
-    },
-    data: {
-      status: IMPORT_JOB_STATUS.pending,
-      startedAt: null,
-      finishedAt: null,
-      error: null,
-      result: Prisma.DbNull,
-    },
-  })
-}
-
-export async function markImportJobRunCompleted(jobRunId: string, result?: Prisma.InputJsonValue) {
-  return await prisma.importJobRun.update({
-    where: { id: jobRunId },
-    data: {
-      status: IMPORT_JOB_RUN_STATUS.completed,
-      result,
-      error: null,
-      finishedAt: new Date(),
-    },
-  })
-}
-
-export async function markImportJobRunFailed(jobRunId: string, error: string, result?: Prisma.InputJsonValue) {
-  return await prisma.importJobRun.update({
-    where: { id: jobRunId },
-    data: {
-      status: IMPORT_JOB_RUN_STATUS.failed,
-      error,
-      result,
-      finishedAt: new Date(),
-    },
-  })
-}
-
-export async function createImportJobArtifact(input: {
-  importJobId: string
-  importJobRunId?: string
-  organizationId: string
-  userId: string
-  kind: string
-  name: string
-  payload?: Prisma.InputJsonValue
-}) {
-  return await prisma.importJobArtifact.create({
-    data: {
-      importJobId: input.importJobId,
-      importJobRunId: input.importJobRunId,
-      organizationId: input.organizationId,
-      userId: input.userId,
-      kind: input.kind,
-      name: input.name,
-      payload: input.payload,
-    },
-  })
-}
-
-export async function getImportJobById(jobId: string, userId: string, organizationId?: string) {
+export async function getImportJobById(jobId: string, userId: string) {
   return await prisma.importJob.findFirst({
     where: {
       id: jobId,
       userId,
-      organizationId,
-    },
-    include: {
-      jobRuns: {
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 20,
-      },
-      artifacts: {
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 30,
-      },
-      dataSource: true,
     },
   })
 }
@@ -223,35 +112,6 @@ export async function getImportJobsByOrganization(organizationId: string, limit:
     take: limit,
     include: {
       dataSource: true,
-      jobRuns: {
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 1,
-      },
-    },
-  })
-}
-
-export async function getNextPendingCsvImportJob() {
-  return await prisma.importJob.findFirst({
-    where: {
-      type: IMPORT_JOB_TYPE.csvTransactions,
-      status: IMPORT_JOB_STATUS.pending,
-    },
-    orderBy: {
-      createdAt: "asc",
-    },
-    include: {
-      artifacts: {
-        where: {
-          kind: "input-rows",
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 1,
-      },
     },
   })
 }

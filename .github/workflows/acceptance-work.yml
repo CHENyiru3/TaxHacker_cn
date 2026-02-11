@@ -59,7 +59,7 @@ jobs:
         run: npx prisma generate --schema prisma/schema.prisma
 
       - name: Targeted lint (new architecture files)
-        run: npx eslint lib/i18n.ts lib/i18n-dictionary.ts lib/organization.ts lib/ai/change-request.ts models/organizations.ts models/audit-logs.ts models/import-jobs.ts models/agent-chat.ts services/import-jobs-service.ts services/agent-chat-service.ts app/api/imports/route.ts app/api/imports/[jobId]/route.ts app/api/imports/[jobId]/retry/route.ts app/api/imports/worker/process-next/route.ts app/api/ai/change-request/route.ts app/api/agent/chat/route.ts app/api/agent/sessions/route.ts app/(app)/import/csv/actions.tsx app/(app)/import/jobs/[jobId]/page.tsx components/i18n/locale-provider.tsx components/sidebar/language-switcher.tsx components/import/job-detail-panel.tsx
+        run: npx eslint lib/i18n.ts lib/i18n-dictionary.ts lib/organization.ts models/organizations.ts models/audit-logs.ts models/import-jobs.ts app/api/imports/route.ts app/api/imports/[jobId]/route.ts app/(app)/import/csv/actions.tsx components/i18n/locale-provider.tsx components/sidebar/language-switcher.tsx
 
       - name: Production build
         run: npm run build

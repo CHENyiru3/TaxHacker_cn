@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 type ImportJobWithDataSource = {
@@ -13,11 +12,6 @@ type ImportJobWithDataSource = {
     name: string
     type: string
   } | null
-  jobRuns: {
-    id: string
-    attempt: number
-    status: string
-  }[]
 }
 
 const STATUS_META: Record<
@@ -126,18 +120,16 @@ export function ImportJobsOverview({
                   <th className="px-4 py-3">任务类型</th>
                   <th className="px-4 py-3">数据源</th>
                   <th className="px-4 py-3">状态</th>
-                  <th className="px-4 py-3">最近执行</th>
                   <th className="px-4 py-3">创建时间</th>
                   <th className="px-4 py-3">开始时间</th>
                   <th className="px-4 py-3">完成时间</th>
                   <th className="px-4 py-3">结果</th>
-                  <th className="px-4 py-3">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {jobs.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-muted-foreground" colSpan={9}>
+                    <td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>
                       暂无导入任务，前往「CSV 导入」开始第一批数据导入。
                     </td>
                   </tr>
@@ -150,28 +142,16 @@ export function ImportJobsOverview({
 
                     return (
                       <tr key={job.id} className="border-b last:border-0">
-                        <td className="px-4 py-3">
-                          <Link href={`/import/jobs/${job.id}`} className="font-medium hover:underline">
-                            {job.type}
-                          </Link>
-                        </td>
+                        <td className="px-4 py-3">{job.type}</td>
                         <td className="px-4 py-3">{job.dataSource?.name ?? "-"}</td>
                         <td className="px-4 py-3">
                           <Badge variant={statusMeta.badgeVariant}>{statusMeta.label}</Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          {job.jobRuns[0] ? `第 ${job.jobRuns[0].attempt} 次（${job.jobRuns[0].status}）` : "-"}
                         </td>
                         <td className="px-4 py-3">{formatDateTime(job.createdAt)}</td>
                         <td className="px-4 py-3">{formatDateTime(job.startedAt)}</td>
                         <td className="px-4 py-3">{formatDateTime(job.finishedAt)}</td>
                         <td className="px-4 py-3 max-w-[280px] truncate" title={job.error ?? "成功"}>
                           {job.error ?? "成功"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Link href={`/import/jobs/${job.id}`} className="text-primary hover:underline">
-                            查看详情
-                          </Link>
                         </td>
                       </tr>
                     )
