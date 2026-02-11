@@ -4,9 +4,11 @@ import MobileMenu from "@/components/sidebar/mobile-menu"
 import { AppSidebar } from "@/components/sidebar/sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Toaster } from "@/components/ui/sonner"
+import { LocaleProvider } from "@/components/i18n/locale-provider"
 import { getCurrentUser, isSubscriptionExpired } from "@/lib/auth"
 import config from "@/lib/config"
 import { getUnsortedFilesCount } from "@/models/files"
+import { getServerLocale } from "@/lib/i18n"
 import type { Metadata, Viewport } from "next"
 import "../globals.css"
 import { NotificationProvider } from "./context"
@@ -32,6 +34,7 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
   const unsortedFilesCount = await getUnsortedFilesCount(user.id)
+  const locale = await getServerLocale()
 
   const userProfile = {
     id: user.id,
@@ -45,23 +48,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <NotificationProvider>
-      <ScreenDropArea>
-        <SidebarProvider>
-          <MobileMenu unsortedFilesCount={unsortedFilesCount} />
-          <AppSidebar
-            profile={userProfile}
-            unsortedFilesCount={unsortedFilesCount}
-            isSelfHosted={config.selfHosted.isEnabled}
-          />
-          <SidebarInset className="w-full h-full mt-[60px] md:mt-0 overflow-auto">
-            {isSubscriptionExpired(user) && <SubscriptionExpired />}
-            {children}
-          </SidebarInset>
-        </SidebarProvider>
-        <Toaster />
-      </ScreenDropArea>
-    </NotificationProvider>
+    <LocaleProvider initialLocale={locale}>
+      <NotificationProvider>
+        <ScreenDropArea>
+          <SidebarProvider>
+            <MobileMenu unsortedFilesCount={unsortedFilesCount} />
+            <AppSidebar
+              profile={userProfile}
+              unsortedFilesCount={unsortedFilesCount}
+              isSelfHosted={config.selfHosted.isEnabled}
+            />
+            <SidebarInset className="w-full h-full mt-[60px] md:mt-0 overflow-auto">
+              {isSubscriptionExpired(user) && <SubscriptionExpired />}
+              {children}
+            </SidebarInset>
+          </SidebarProvider>
+          <Toaster />
+        </ScreenDropArea>
+      </NotificationProvider>
+    </LocaleProvider>
   )
 }
 

@@ -12,8 +12,8 @@ datasource db {
 }
 
 model User {
-  id                  String        @id @default(uuid()) @db.Uuid
-  email               String        @unique
+  id                  String              @id @default(uuid()) @db.Uuid
+  email               String              @unique
   name                String
   avatar              String?
   settings            Setting[]
@@ -23,23 +23,31 @@ model User {
   files               File[]
   currencies          Currency[]
   transactions        Transaction[]
-  createdAt           DateTime      @default(now()) @map("created_at")
-  updatedAt           DateTime      @updatedAt @map("updated_at")
-  stripeCustomerId    String?       @map("stripe_customer_id")
-  membershipPlan      String?       @map("membership_plan")
-  membershipExpiresAt DateTime?     @map("membership_expires_at")
-  emailVerified       Boolean       @default(false) @map("is_email_verified")
-  storageUsed         Int           @default(0) @map("storage_used")
-  storageLimit        Int           @default(-1) @map("storage_limit")
-  aiBalance           Int           @default(0) @map("ai_balance")
-  businessName        String?       @map("business_name")
-  businessAddress     String?       @map("business_address")
-  businessBankDetails String?       @map("business_bank_details")
-  businessLogo        String?       @map("business_logo")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  stripeCustomerId    String?             @map("stripe_customer_id")
+  membershipPlan      String?             @map("membership_plan")
+  membershipExpiresAt DateTime?           @map("membership_expires_at")
+  emailVerified       Boolean             @default(false) @map("is_email_verified")
+  storageUsed         Int                 @default(0) @map("storage_used")
+  storageLimit        Int                 @default(-1) @map("storage_limit")
+  aiBalance           Int                 @default(0) @map("ai_balance")
+  businessName        String?             @map("business_name")
+  businessAddress     String?             @map("business_address")
+  businessBankDetails String?             @map("business_bank_details")
+  businessLogo        String?             @map("business_logo")
   accounts            Account[]
   sessions            Session[]
   appData             AppData[]
   progress            Progress[]
+  dataSources         DataSource[]
+  importJobs          ImportJob[]
+  importJobRuns       ImportJobRun[]
+  importJobArtifacts  ImportJobArtifact[]
+  memberships         Membership[]
+  auditLogs           AuditLog[]
+  chatSessions        ChatSession[]
+  chatMessages        ChatMessage[]
 
   @@map("users")
 }
@@ -236,4 +244,187 @@ model Progress {
 
   @@index([userId])
   @@map("progress")
+}
+
+model DataSource {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  code           String
+  type           String
+  name           String
+  config         Json?
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  importJobs     ImportJob[]
+
+  @@unique([organizationId, code])
+  @@index([userId])
+  @@index([organizationId, type])
+  @@map("data_sources")
+}
+
+model ImportJob {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @map("user_id") @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  dataSourceId   String?             @map("data_source_id") @db.Uuid
+  type           String
+  status         String              @default("pending")
+  input          Json?
+  result         Json?
+  error          String?
+  startedAt      DateTime?           @map("started_at")
+  finishedAt     DateTime?           @map("finished_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dataSource     DataSource?         @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
+  jobRuns        ImportJobRun[]
+  artifacts      ImportJobArtifact[]
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([type])
+  @@map("import_jobs")
+}
+
+model ImportJobRun {
+  id             String              @id @default(uuid()) @db.Uuid
+  importJobId    String              @map("import_job_id") @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  userId         String              @map("user_id") @db.Uuid
+  attempt        Int                 @default(1)
+  status         String              @default("running")
+  startedAt      DateTime            @default(now()) @map("started_at")
+  finishedAt     DateTime?           @map("finished_at")
+  result         Json?
+  error          String?
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  importJob      ImportJob           @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artifacts      ImportJobArtifact[]
+
+  @@index([importJobId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([status])
+  @@map("import_job_runs")
+}
+
+model ImportJobArtifact {
+  id             String        @id @default(uuid()) @db.Uuid
+  importJobId    String        @map("import_job_id") @db.Uuid
+  importJobRunId String?       @map("import_job_run_id") @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  userId         String        @map("user_id") @db.Uuid
+  kind           String
+  name           String
+  payload        Json?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  importJob      ImportJob     @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  importJobRun   ImportJobRun? @relation(fields: [importJobRunId], references: [id], onDelete: SetNull)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([importJobId, createdAt])
+  @@index([importJobRunId])
+  @@index([organizationId, createdAt])
+  @@index([kind])
+  @@map("import_job_artifacts")
+}
+
+model Organization {
+  id                 String              @id @default(uuid()) @db.Uuid
+  slug               String              @unique
+  name               String
+  isActive           Boolean             @default(true) @map("is_active")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  memberships        Membership[]
+  auditLogs          AuditLog[]
+  dataSources        DataSource[]
+  importJobs         ImportJob[]
+  importJobRuns      ImportJobRun[]
+  importJobArtifacts ImportJobArtifact[]
+  chatSessions       ChatSession[]
+  chatMessages       ChatMessage[]
+
+  @@map("organizations")
+}
+
+model ChatSession {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  userId         String        @map("user_id") @db.Uuid
+  title          String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages       ChatMessage[]
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id             String       @id @default(uuid()) @db.Uuid
+  chatSessionId  String       @map("chat_session_id") @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  role           String
+  content        String
+  metadata       Json?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  chatSession    ChatSession  @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([chatSessionId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("chat_messages")
+}
+
+model Membership {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  role           String       @default("CLIENT_VIEWER")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId, role])
+  @@map("memberships")
+}
+
+model AuditLog {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String?      @map("user_id") @db.Uuid
+  action         String
+  resourceType   String       @map("resource_type")
+  resourceId     String?      @map("resource_id")
+  metadata       Json?
+  ipAddress      String?      @map("ip_address")
+  userAgent      String?      @map("user_agent")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([action])
+  @@index([resourceType, resourceId])
+  @@map("audit_logs")
 }
