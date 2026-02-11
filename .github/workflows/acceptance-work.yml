@@ -1,0 +1,65 @@
+name: Acceptance - Work Branch
+
+on:
+  push:
+    branches:
+      - work
+  pull_request:
+    branches:
+      - work
+  workflow_dispatch:
+
+concurrency:
+  group: acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-policy:
+    name: Branch policy guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate target branch
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.base_ref }}" != "work" ]; then
+            echo "PR base branch must be work"
+            exit 1
+          fi
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_name }}" != "work" ]; then
+            echo "Push validation is only supported for work"
+            exit 1
+          fi
+
+  validate:
+    name: Build & validation
+    runs-on: ubuntu-latest
+    needs: branch-policy
+    timeout-minutes: 20
+
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql://user:pass@localhost:5432/taxhacker
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma schema validation
+        run: npx prisma validate --schema prisma/schema.prisma
+
+      - name: Prisma client generation
+        run: npx prisma generate --schema prisma/schema.prisma
+
+      - name: Targeted lint (new architecture files)
+        run: npx eslint lib/i18n.ts lib/i18n-dictionary.ts lib/organization.ts lib/ai/change-request.ts models/organizations.ts models/audit-logs.ts models/import-jobs.ts models/agent-chat.ts services/import-jobs-service.ts services/agent-chat-service.ts app/api/imports/route.ts app/api/imports/[jobId]/route.ts app/api/imports/[jobId]/retry/route.ts app/api/imports/worker/process-next/route.ts app/api/imports/worker/process-batch/route.ts app/api/ai/change-request/route.ts app/api/agent/chat/route.ts app/api/agent/sessions/route.ts app/(app)/import/csv/actions.tsx app/(app)/import/jobs/[jobId]/page.tsx app/(app)/agent/page.tsx components/agent/agent-workbench.tsx components/i18n/locale-provider.tsx components/sidebar/language-switcher.tsx components/sidebar/sidebar.tsx components/import/job-detail-panel.tsx lib/import-error.ts
+
+      - name: Production build
+        run: npm run build

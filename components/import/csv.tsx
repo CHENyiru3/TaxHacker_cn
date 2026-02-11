@@ -3,8 +3,10 @@
 import { parseCSVAction, saveTransactionsAction } from "@/app/(app)/import/csv/actions"
 import { FormError } from "@/components/forms/error"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field } from "@/prisma/client"
 import { Loader2, Play, Upload } from "lucide-react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { startTransition, useActionState, useEffect, useState } from "react"
 
@@ -68,7 +70,7 @@ export function ImportCSVTable({ fields }: { fields: Field[] }) {
     if (csvData.length === 0) return
 
     if (!isAtLeastOneFieldMapped(columnMappings)) {
-      alert("Please map at least one column to a field")
+      alert("请至少映射一个字段")
       return
     }
 
@@ -95,35 +97,55 @@ export function ImportCSVTable({ fields }: { fields: Field[] }) {
   return (
     <>
       {csvData.length === 0 && (
-        <div className="flex flex-col items-center justify-center gap-2 h-full min-h-[400px]">
-          <p className="text-muted-foreground">Upload your CSV file to import transactions</p>
-          <div className="flex flex-row gap-5 mt-8">
-            <div>
+        <Card className="min-h-[420px]">
+          <CardHeader>
+            <CardTitle>CSV 导入</CardTitle>
+            <CardDescription>上传交易流水文件后，系统将自动解析列结构并进入字段映射流程。</CardDescription>
+          </CardHeader>
+          <CardContent className="flex h-full flex-col items-center justify-center gap-4">
+            <p className="text-sm text-muted-foreground">支持 UTF-8 编码 CSV，建议首行为字段名以提高自动识别准确率。</p>
+            <div className="flex flex-wrap items-center gap-3">
               <input type="file" accept=".csv" className="hidden" id="csv-file" onChange={handleFileChange} />
               <Button type="button" onClick={() => document.getElementById("csv-file")?.click()}>
-                {isParsing ? "Parsing..." : <Upload className="mr-2" />} Import from CSV
+                {isParsing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    解析中...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    选择并解析 CSV
+                  </>
+                )}
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/import/jobs">查看导入任务中心</Link>
               </Button>
             </div>
-          </div>
-          {parseState?.error && <FormError>{parseState.error}</FormError>}
-        </div>
+            {parseState?.error && <FormError>{parseState.error}</FormError>}
+          </CardContent>
+        </Card>
       )}
 
       {csvData.length > 0 && (
         <div>
-          <header className="flex flex-wrap items-center justify-between gap-2 mb-8">
-            <h2 className="flex flex-row gap-3 md:gap-5">
-              <span className="text-3xl font-bold tracking-tight">Import {csvData.length} items from CSV</span>
-            </h2>
+          <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-2xl font-semibold tracking-tight">CSV 预览与字段映射（共 {csvData.length} 行）</h2>
             <div className="flex gap-2">
+              <Button variant="outline" asChild>
+                <Link href="/import/jobs">导入任务中心</Link>
+              </Button>
               <Button onClick={handleSave} disabled={isSaving}>
                 {isSaving ? (
                   <>
-                    <Loader2 className="animate-spin" /> Importing...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    导入中...
                   </>
                 ) : (
                   <>
-                    <Play /> Import {csvData.length} transactions
+                    <Play className="mr-2 h-4 w-4" />
+                    导入 {Math.max(csvData.length - (csvSettings.skipHeader ? 1 : 0), 0)} 条交易
                   </>
                 )}
               </Button>
@@ -132,16 +154,16 @@ export function ImportCSVTable({ fields }: { fields: Field[] }) {
 
           {saveState?.error && <FormError>{saveState.error}</FormError>}
 
-          <div className="flex items-center gap-4 mb-4">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <div className="mb-4 flex items-center gap-4">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                className="w-4 h-4"
+                className="h-4 w-4"
                 id="skip-header"
                 defaultChecked={csvSettings.skipHeader}
                 onChange={(e) => setCSVSettings({ ...csvSettings, skipHeader: e.target.checked })}
               />
-              <span>First row is a header</span>
+              <span>第一行是表头</span>
             </label>
           </div>
 
@@ -149,15 +171,15 @@ export function ImportCSVTable({ fields }: { fields: Field[] }) {
             <div className="relative w-full overflow-auto">
               <table className="w-full caption-bottom text-sm">
                 <thead className="[&_tr]:border-b">
-                  <tr className="border-b transition-colors hover:bg-muted/50">
+                  <tr className="border-b bg-muted/40 transition-colors hover:bg-muted/50">
                     {csvData[0].map((_, index) => (
                       <th key={index} className="h-12 min-w-[200px] px-4 text-left align-middle font-medium">
                         <select
-                          className="w-full p-2 border rounded-md"
+                          className="w-full rounded-md border p-2"
                           value={columnMappings[index] || ""}
                           onChange={(e) => handleMappingChange(index, e.target.value)}
                         >
-                          <option value="">Skip column</option>
+                          <option value="">跳过该列</option>
                           {fields.map((field) => (
                             <option key={field.code} value={field.code}>
                               {field.name}
@@ -189,7 +211,9 @@ export function ImportCSVTable({ fields }: { fields: Field[] }) {
           </div>
 
           {csvData.length > MAX_PREVIEW_ROWS && (
-            <p className="text-muted-foreground mt-4">and {csvData.length - MAX_PREVIEW_ROWS} more entries...</p>
+            <p className="mt-4 text-sm text-muted-foreground">
+              已展示前 {MAX_PREVIEW_ROWS} 行，剩余 {csvData.length - MAX_PREVIEW_ROWS} 行。
+            </p>
           )}
         </div>
       )}
