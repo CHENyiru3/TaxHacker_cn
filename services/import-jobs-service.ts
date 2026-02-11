@@ -1,4 +1,5 @@
 import { getCurrentMembership } from "@/lib/organization"
+import { EXPORT_AND_IMPORT_FIELD_MAP } from "@/models/export_and_import"
 import {
   createDataSourceForCsvImport,
   createImportJob,
@@ -7,6 +8,7 @@ import {
   getImportJobById,
   getImportJobSummaryByOrganization,
   getImportJobsByOrganization,
+  getNextPendingCsvImportJob,
   IMPORT_JOB_STATUS,
   IMPORT_JOB_TYPE,
   markImportJobCompleted,
@@ -16,6 +18,7 @@ import {
   markImportJobRunning,
   resetImportJobToPending,
 } from "@/models/import-jobs"
+import { createTransaction } from "@/models/transactions"
 import { Prisma } from "@/prisma/client"
 
 export async function listImportJobsForCurrentOrganization(limit: number = 30) {
@@ -101,6 +104,126 @@ export async function retryImportJobForCurrentUser(jobId: string, userId: string
   })
 
   return await getImportJobById(job.id, userId, membership.organizationId)
+}
+
+export async function processCsvRowsForImportJob(input: {
+  importJobId: string
+  userId: string
+  organizationId: string
+  rows: Record<string, unknown>[]
+}) {
+  const run = await createImportJobRun({
+    importJobId: input.importJobId,
+    userId: input.userId,
+    organizationId: input.organizationId,
+  })
+
+  await markImportJobRunning(input.importJobId)
+
+  let importedCount = 0
+
+  try {
+    for (const row of input.rows) {
+      const transactionData: Record<string, unknown> = {}
+      for (const [fieldCode, value] of Object.entries(row)) {
+        const fieldDef = EXPORT_AND_IMPORT_FIELD_MAP[fieldCode]
+        if (fieldDef?.import) {
+          transactionData[fieldCode] = await fieldDef.import(input.userId, value as string)
+        } else {
+          transactionData[fieldCode] = value as string
+        }
+      }
+
+      await createTransaction(input.userId, transactionData)
+      importedCount += 1
+    }
+
+    const result = {
+      importedCount,
+      failedCount: input.rows.length - importedCount,
+    }
+
+    await markImportJobCompleted(input.importJobId, result)
+    await markImportJobRunCompleted(run.id, result)
+
+    await createImportJobArtifact({
+      importJobId: input.importJobId,
+      importJobRunId: run.id,
+      organizationId: input.organizationId,
+      userId: input.userId,
+      kind: "summary",
+      name: "CSV 导入摘要",
+      payload: result,
+    })
+
+    return {
+      success: true,
+      runId: run.id,
+      result,
+    }
+  } catch (error) {
+    const message = String(error)
+
+    await markImportJobFailed(input.importJobId, message)
+    await markImportJobRunFailed(run.id, message)
+
+    await createImportJobArtifact({
+      importJobId: input.importJobId,
+      importJobRunId: run.id,
+      organizationId: input.organizationId,
+      userId: input.userId,
+      kind: "error",
+      name: "CSV 导入失败日志",
+      payload: {
+        error: message,
+      },
+    })
+
+    return {
+      success: false,
+      runId: run.id,
+      error: message,
+    }
+  }
+}
+
+export async function processNextPendingImportJob() {
+  const job = await getNextPendingCsvImportJob()
+  if (!job) {
+    return { processed: false, reason: "No pending job" }
+  }
+
+  const inputArtifact = job.artifacts[0]
+  const payload = (inputArtifact?.payload || {}) as { rows?: Record<string, unknown>[] }
+
+  if (!payload.rows || payload.rows.length === 0) {
+    await markImportJobFailed(job.id, "Missing input rows artifact for processing")
+    await createImportJobArtifact({
+      importJobId: job.id,
+      organizationId: job.organizationId,
+      userId: job.userId,
+      kind: "error",
+      name: "缺少输入数据",
+      payload: {
+        message: "No input rows artifact found",
+      },
+    })
+
+    return { processed: false, reason: "Missing input rows" }
+  }
+
+  const result = await processCsvRowsForImportJob({
+    importJobId: job.id,
+    userId: job.userId,
+    organizationId: job.organizationId,
+    rows: payload.rows,
+  })
+
+  return {
+    processed: true,
+    jobId: job.id,
+    result,
+  }
 }
 
 export async function startImportJobRun(input: { importJobId: string; userId: string; organizationId: string }) {

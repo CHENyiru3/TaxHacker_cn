@@ -233,6 +233,29 @@ export async function getImportJobsByOrganization(organizationId: string, limit:
   })
 }
 
+export async function getNextPendingCsvImportJob() {
+  return await prisma.importJob.findFirst({
+    where: {
+      type: IMPORT_JOB_TYPE.csvTransactions,
+      status: IMPORT_JOB_STATUS.pending,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+    include: {
+      artifacts: {
+        where: {
+          kind: "input-rows",
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 1,
+      },
+    },
+  })
+}
+
 export async function getImportJobSummaryByOrganization(organizationId: string) {
   const [total, pending, running, completed, failed] = await Promise.all([
     prisma.importJob.count({ where: { organizationId } }),

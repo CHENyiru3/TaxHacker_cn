@@ -46,6 +46,8 @@ model User {
   importJobArtifacts  ImportJobArtifact[]
   memberships         Membership[]
   auditLogs           AuditLog[]
+  chatSessions        ChatSession[]
+  chatMessages        ChatMessage[]
 
   @@map("users")
 }
@@ -351,8 +353,45 @@ model Organization {
   importJobs         ImportJob[]
   importJobRuns      ImportJobRun[]
   importJobArtifacts ImportJobArtifact[]
+  chatSessions       ChatSession[]
+  chatMessages       ChatMessage[]
 
   @@map("organizations")
+}
+
+model ChatSession {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  userId         String        @map("user_id") @db.Uuid
+  title          String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages       ChatMessage[]
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id             String       @id @default(uuid()) @db.Uuid
+  chatSessionId  String       @map("chat_session_id") @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  role           String
+  content        String
+  metadata       Json?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  chatSession    ChatSession  @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([chatSessionId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("chat_messages")
 }
 
 model Membership {
