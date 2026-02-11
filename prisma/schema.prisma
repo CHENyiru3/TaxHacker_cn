@@ -12,8 +12,8 @@ datasource db {
 }
 
 model User {
-  id                  String        @id @default(uuid()) @db.Uuid
-  email               String        @unique
+  id                  String              @id @default(uuid()) @db.Uuid
+  email               String              @unique
   name                String
   avatar              String?
   settings            Setting[]
@@ -23,19 +23,19 @@ model User {
   files               File[]
   currencies          Currency[]
   transactions        Transaction[]
-  createdAt           DateTime      @default(now()) @map("created_at")
-  updatedAt           DateTime      @updatedAt @map("updated_at")
-  stripeCustomerId    String?       @map("stripe_customer_id")
-  membershipPlan      String?       @map("membership_plan")
-  membershipExpiresAt DateTime?     @map("membership_expires_at")
-  emailVerified       Boolean       @default(false) @map("is_email_verified")
-  storageUsed         Int           @default(0) @map("storage_used")
-  storageLimit        Int           @default(-1) @map("storage_limit")
-  aiBalance           Int           @default(0) @map("ai_balance")
-  businessName        String?       @map("business_name")
-  businessAddress     String?       @map("business_address")
-  businessBankDetails String?       @map("business_bank_details")
-  businessLogo        String?       @map("business_logo")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  stripeCustomerId    String?             @map("stripe_customer_id")
+  membershipPlan      String?             @map("membership_plan")
+  membershipExpiresAt DateTime?           @map("membership_expires_at")
+  emailVerified       Boolean             @default(false) @map("is_email_verified")
+  storageUsed         Int                 @default(0) @map("storage_used")
+  storageLimit        Int                 @default(-1) @map("storage_limit")
+  aiBalance           Int                 @default(0) @map("ai_balance")
+  businessName        String?             @map("business_name")
+  businessAddress     String?             @map("business_address")
+  businessBankDetails String?             @map("business_bank_details")
+  businessLogo        String?             @map("business_logo")
   accounts            Account[]
   sessions            Session[]
   appData             AppData[]

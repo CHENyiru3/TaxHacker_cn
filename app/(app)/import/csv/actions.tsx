@@ -42,7 +42,6 @@ export async function parseCSVAction(
     parser.write(buffer)
     parser.end()
 
-    // Wait for parsing to complete
     await new Promise((resolve) => parser.on("end", resolve))
 
     return { success: true, data: rows }
@@ -102,7 +101,12 @@ export async function saveTransactionsAction(
     }
 
     revalidatePath("/import/csv")
+    revalidatePath("/import/jobs")
     revalidatePath("/transactions")
+
+    if (!result.success) {
+      return { success: false, error: "保存交易失败：" + result.error }
+    }
 
     return { success: true }
   } catch (error) {
